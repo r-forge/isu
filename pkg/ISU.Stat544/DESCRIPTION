@@ -1,0 +1,10 @@
+Package: ISU.Stat544
+Type: Package
+Title: Stat544: Bayesian Statistics
+Version: 0.1-0
+Date: 2010-01-12
+Author: Yihui Xie
+Maintainer: Yihui Xie <xie@yihui.name>
+Description: Misc functions and datasets for the course Stat544 in the Department of Statistics, Iowa State University.
+License: GPL-2 | GPL-3
+LazyLoad: yes
