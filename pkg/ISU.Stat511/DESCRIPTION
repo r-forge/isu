@@ -1,0 +1,10 @@
+Package: ISU.Stat511
+Type: Package
+Title: Stat 511: Statistical Methods
+Version: 0.1
+Date: 2010-01-31
+Author: Dan Nettleton, Yihui Xie
+Maintainer: Yihui Xie <xie@yihui.name>
+Description: A collection of R functions and datasets used in the course Stat 511 in the Department of Statistics, Iowa State University.
+License: GPL-2 | GPL-3
+LazyLoad: yes
