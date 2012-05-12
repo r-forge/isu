@@ -1,5 +1,4 @@
 .gitignore
-clean-up.R
 tikzDictionary$
 aux$
 log$
@@ -12,3 +11,4 @@ knitr-minimal.html
 knitr-minimal.md
 knitr-latex.tex
 png$
+^\.Rproj\.user$

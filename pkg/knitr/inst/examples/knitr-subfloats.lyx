@@ -75,9 +75,17 @@ status open
 
 \begin_layout Plain Layout
 
-% 
-\backslash
-SweaveOpts{fig.path='figure/subfloats-'}
+<<setup, include=FALSE>>=
+\end_layout
+
+\begin_layout Plain Layout
+
+opts_chunk$set(fig.path='figure/subfloats-')
+\end_layout
+
+\begin_layout Plain Layout
+
+@
 \end_layout
 
 \end_inset
@@ -159,6 +167,18 @@ status open
 
 \backslash
 Sexpr{packageVersion('knitr')}
+\end_layout
+
+\end_inset
+
+.
+ Rnw source at 
+\begin_inset Flex URL
+status collapsed
+
+\begin_layout Plain Layout
+
+https://github.com/yihui/knitr/blob/master/inst/examples/knitr-subfloats.Rnw
 \end_layout
 
 \end_inset
