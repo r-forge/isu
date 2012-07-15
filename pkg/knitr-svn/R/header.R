@@ -2,18 +2,21 @@
 insert_header = function(doc) {
   if (is.null(b <- knit_patterns$get('header.begin'))) return(doc)
 
-  fmt = opts_knit$get('out.format')
-  if (fmt == 'html')
+  if (out_format('html'))
     return(insert_header_html(doc, b))
-  if (fmt %in% c('latex', 'listings', 'sweave'))
+  if (out_format(c('latex', 'listings', 'sweave')))
     return(insert_header_latex(doc, b))
   doc
 }
 
 ## Makes latex header with macros required for highlighting, tikz and framed
 make_header_latex = function() {
-  h = "\\usepackage{graphicx, color}"
-  h = paste(c(h, .header.maxwidth, opts_knit$get('header')), collapse = "\n")
+  h = paste(c(
+    '\\usepackage{graphicx, color}', .header.maxwidth, opts_knit$get('header'),
+    if (out_format('latex')) {
+      if (opts_knit$get('use.highlight')) highlight_fun('boxes_latex')() else '\\usepackage{alltt}'
+    }
+  ), collapse = '\n')
   if (opts_knit$get('self.contained')) h else {
     writeLines(h, 'knitr.sty')
     '\\usepackage{knitr}'

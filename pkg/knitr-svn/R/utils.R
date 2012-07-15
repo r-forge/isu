@@ -69,7 +69,7 @@ sc_split = function(string) {
 
 ## extract LaTeX packages for tikzDevice
 set_preamble = function(input) {
-  if (opts_knit$get('out.format') != 'latex') return()
+  if (!out_format('latex')) return()
   db = knit_patterns$get('document.begin')
   if (length(db) != 1L) return()  # no \begin{document} pattern
   hb = knit_patterns$get('header.begin')
@@ -293,6 +293,12 @@ test_latex_pkg = function(name, path) {
 ## get child and parent mode
 child_mode = function() opts_knit$get('child')
 parent_mode = function() opts_knit$get('parent')
+
+# return the output format, or if current format is in specified formats
+out_format = function(x) {
+  fmt = opts_knit$get('out.format')
+  if (missing(x)) fmt else fmt %in% x
+}
 
 #' Path for figure files
 #'
