@@ -517,14 +517,19 @@ native_encode = function(x, to = '') {
   enc = Encoding(x)
   idx = enc != 'unknown'
   if (to == '') {
-    if (any(idx)) x[idx] = iconv(x[idx], enc[idx][1L], to)
+    x2 = x
+    if (any(idx)) x2[idx] = iconv(x2[idx], enc[idx][1L], to)
+    if (any(is.na(x2))) {
+      warning('some characters may not work under the current locale')
+    } else x = x2  # use conversion only if it succeeds
   } else x = iconv(x, if (any(idx)) enc[idx][1L] else '', to)
   x
 }
 
 # make the encoding case-insensitive, e.g. LyX uses ISO-8859-15 but R uses iso-8859-15
 correct_encode = function(encoding) {
-  if (encoding == 'native.enc' || encoding == '') return('')
+  if (encoding == 'native.enc' || encoding == '' || encoding == localeToCharset())
+    return('')
   if (is.na(idx <- match(tolower(encoding), tolower(iconvlist())))) {
     warning('encoding "', encoding, '" not supported; using the native encoding instead')
     ''
