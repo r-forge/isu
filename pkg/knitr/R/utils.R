@@ -76,12 +76,10 @@ sc_split = function(string) {
 }
 
 ## extract LaTeX packages for tikzDevice
-set_preamble = function(input) {
+set_preamble = function(input, patterns) {
   if (!out_format('latex')) return()
-  db = knit_patterns$get('document.begin')
-  if (length(db) != 1L) return()  # no \begin{document} pattern
-  hb = knit_patterns$get('header.begin')
-  if (length(hb) != 1L) return()  # no \documentclass{} pattern
+  if (length(db <- patterns$document.begin) != 1L) return()  # no \begin{document} pattern
+  if (length(hb <- patterns$header.begin) != 1L) return()  # no \documentclass{} pattern
   idx2 = str_detect(input, db)
   if (!any(idx2)) return()
   if ((idx2 <- which(idx2)[1]) < 2L) return()
@@ -89,17 +87,19 @@ set_preamble = function(input) {
   idx = str_locate(txt, hb)  # locate documentclass
   if (any(is.na(idx))) return()
   options(tikzDocumentDeclaration = str_sub(txt, idx[, 1L], idx[, 2L]))
-  preamble = pure_preamble(split_lines(str_sub(txt, idx[, 2L] + 1L)))
+  preamble = pure_preamble(split_lines(str_sub(txt, idx[, 2L] + 1L)), patterns)
   .knitEnv$tikzPackages = c(.header.sweave.cmd, preamble, '\n')
 }
 ## filter out code chunks from preamble if they exist (they do in LyX/Sweave)
-pure_preamble = function(preamble) {
-  res = split_file(lines = preamble, set.preamble = FALSE) # should avoid recursion
+pure_preamble = function(preamble, patterns) {
+  res = split_file(lines = preamble, set.preamble = FALSE, patterns) # should avoid recursion
   if (!parent_mode()) {
     ## when not in parent mode, just return normal texts and skip code
     return(unlist(res))
   }
   owd = setwd(input_dir()); on.exit(setwd(owd))
+  progress = opts_knit$get('progress')  # suppress printing of blocks and texts
+  opts_knit$set(progress = FALSE); on.exit(opts_knit$set(progress = progress), add = TRUE)
   ## run the code in the preamble
   sapply(res, if (opts_knit$get('tangle')) process_tangle else process_group)
 }
@@ -133,7 +133,7 @@ pure_preamble = function(preamble) {
 #'
 #' # @@
 set_parent = function(parent) {
-  if (child_mode()) return() # quit if in child mode
+  if (child_mode()) return(invisible(NULL)) # quit if in child mode
   opts_knit$set(parent = TRUE)
   set_preamble(readLines(parent, warn = FALSE))
   invisible(NULL)

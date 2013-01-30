@@ -6,15 +6,25 @@
 
 - when the chunk option `eval=FALSE`, `purl()` will comment out the code when extracting code chunks (thanks, Randall Pruim)
 
+- the environment variable `R_KNITR_PROGRESS` can be used to set the package option `progress` in `opts_knit`, e.g. when `R_KNITR_PROGRESS` is `FALSE`, this option will be set to `FALSE` when the package is loaded (#395)
+
 ## BUG FIXES
 
 - fixed #465: when `eval=FALSE` and `echo` is numeric, code was incorrectly filtered by the indices in `echo` (thanks, @ateucher)
 
 - `>` was not allowed in HTML inline code expressions (http://stackoverflow.com/q/14360296/559676); now the regular expression works correctly to look for `-->` instead of `>`
 
+- `set_parent()` should not print `NULL` in the child document: http://stackoverflow.com/q/14487718/559676 (thanks, Thomas Holz)
+
+- child documents now inherit the encoding parameter from their parent document, i.e. the `encoding` value in `knit(..., encoding = ?)` is applied to `knit_child()`; note this assumes the parent document and the child documents use the same encoding (thanks, Henrik Nyhus)
+
 ## MAJOR CHANGES
 
 - empty inline expressions are no longer recognized, e.g. `\Sexpr{}` will not be parsed; this allows one to write such markers in tutorials (e.g. `<!--rinline -->` and `` `r ` ``); internally `all_patterns$foo$inline.code` was changed
+
+- the function `build_dep()` was removed (the warning has been there for a long time); please use `dep_auto()` instead
+
+- the package option `filter.chunk.end` was removed; this means in Rnw documents, a single line `@` has the meaning of terminating a chunk _only if_ there is a chunk header `<<>>=` before it; otherwise it does not have any special meanings
 
 ## MINOR CHANGES
 
