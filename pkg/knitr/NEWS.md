@@ -2,11 +2,15 @@
 
 ## NEW FEATURES
 
+- (experimental) R 3.0.0 will support non-Sweave vignettes, e.g. Rnw documents can be compiled by **knitr** instead of Sweave; in addition, R Markdown vignettes have also become first-class citizens as R package vignettes; see http://yihui.name/knitr/demo/vignette/ for details
+
 - a new engine for coffeescript (i.e. the chunk option `engine='coffee'`); see https://github.com/yihui/knitr-examples/blob/master/080-engine-coffeescript.Rmd for an example (thanks, Nacho Caballero)
 
 - when the chunk option `eval=FALSE`, `purl()` will comment out the code when extracting code chunks (thanks, Randall Pruim)
 
 - the environment variable `R_KNITR_PROGRESS` can be used to set the package option `progress` in `opts_knit`, e.g. when `R_KNITR_PROGRESS` is `FALSE`, this option will be set to `FALSE` when the package is loaded (#395)
+
+- a new function `knit2wp()` which compiles R Markdown documents and publishes the results to WordPress; see http://yihui.name/knitr/demo/wordpress/ for details
 
 ## BUG FIXES
 
@@ -26,7 +30,11 @@
 
 - the package option `filter.chunk.end` was removed; this means in Rnw documents, a single line `@` has the meaning of terminating a chunk _only if_ there is a chunk header `<<>>=` before it; otherwise it does not have any special meanings
 
+- the function `run_chunk()` was removed; it is redundant because we already have the chunk option `ref.label` as well as in-chunk reference `<<label>>`
+
 ## MINOR CHANGES
+
+- the function `imgur_upload()` uses Imgur API version 3 now; if you are using the key obtained from version 2, you need to register for your own client id: http://api.imgur.com (#439)
 
 - slight improvement of encoding support in `knit()`
 
