@@ -137,8 +137,8 @@ knit = function(input, output = NULL, tangle = FALSE, text = NULL,
   if (in.file) {
     input.dir = .knitEnv$input.dir; on.exit({.knitEnv$input.dir = input.dir}, add = TRUE)
     .knitEnv$input.dir = dirname(input) # record input dir
-    if (is.null(output)) output = basename(auto_out_name(input))
     ext = tolower(file_ext(input))
+    if (is.null(output)) output = basename(auto_out_name(input, ext))
     options(tikzMetricsDictionary = tikz_dict(input)) # cache tikz dictionary
     knit_concord$set(infile = input)
   }
@@ -268,10 +268,9 @@ process_file = function(text, output) {
   res
 }
 
-auto_out_name = function(input) {
+auto_out_name = function(input, ext = tolower(file_ext(input))) {
   base = file_path_sans_ext(input)
   if (opts_knit$get('tangle')) return(str_c(base, '.R'))
-  ext = tolower(file_ext(input))
   if (ext %in% c('rnw', 'snw')) return(str_c(base, '.tex'))
   if (ext %in% c('rmd', 'rmarkdown', 'rhtml', 'rhtm', 'rtex', 'stex', 'rrst'))
     return(str_c(base, '.', substring(ext, 2L)))
@@ -412,9 +411,6 @@ wrap.error = function(x, options) {
 }
 
 wrap.recordedplot = function(x, options) {
-  if (!is.null(base.dir <- opts_knit$get('base.dir'))) {
-    odir = setwd(base.dir); on.exit(setwd(odir)) # switch to abs dir, then restore
-  }
   ## figure number sequence for multiple plots
   fig.cur = plot_counter()
   options$fig.cur = fig.cur # put fig num in options
