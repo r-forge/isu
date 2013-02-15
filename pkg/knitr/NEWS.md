@@ -14,6 +14,8 @@
 
 - a new function `knit2wp()` which compiles R Markdown documents and publishes the results to WordPress; see http://yihui.name/knitr/demo/wordpress/ for details
 
+- a new hook `hook_webgl()` which writes the WebGL code of an **rgl** scene into the output using `rgl::writeWebGL()` so we can reproduce a 3D plot in the browser (thanks, Stephane Laurent http://stackoverflow.com/q/14879210/559676)
+
 ## BUG FIXES
 
 - fixed #465: when `eval=FALSE` and `echo` is numeric, code was incorrectly filtered by the indices in `echo` (thanks, @ateucher)
@@ -37,6 +39,8 @@
 ## MINOR CHANGES
 
 - the function `imgur_upload()` uses Imgur API version 3 now; if you are using the key obtained from version 2, you need to register for your own client id: http://api.imgur.com (#439)
+
+- allow users to pass a custom environment to `Rcpp::sourceCpp()` in the `Rcpp` engine; fixes http://stackoverflow.com/q/14882486/559676
 
 - slight improvement of encoding support in `knit()`
 
