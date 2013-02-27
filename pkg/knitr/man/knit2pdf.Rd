@@ -2,7 +2,7 @@
 \alias{knit2pdf}
 \title{Convert Rnw or Rrst files to PDF using knit() and texi2pdf() or rst2pdf()}
 \usage{
-knit2pdf(input, output = NULL, compiler = NULL, encoding = getOption("encoding"), 
+knit2pdf(input, output = NULL, compiler = NULL, envir = parent.frame(), encoding = getOption("encoding"), 
     ...)
 }
 \arguments{
@@ -24,6 +24,10 @@ knit2pdf(input, output = NULL, compiler = NULL, encoding = getOption("encoding")
   \item{output}{path of the output file; if \code{NULL},
   this function will try to guess and it will be under the
   current working directory}
+
+  \item{envir}{the environment in which the code chunks are
+  to be evaluated (can use \code{\link{new.env}()} to
+  guarantee an empty new environment)}
 
   \item{encoding}{the encoding of the input file; see
   \code{\link{file}}}
