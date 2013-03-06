@@ -195,7 +195,7 @@ is_tikz_dev = function(options) {
 }
 
 tikz_dict = function(path) {
-  str_c(file_path_sans_ext(basename(path)), '-tikzDictionary')
+  str_c(sans_ext(basename(path)), '-tikzDictionary')
 }
 
 ## compatibility with Sweave and old beta versions of knitr
@@ -427,4 +427,13 @@ correct_encode = function(encoding) {
     warning('encoding "', encoding, '" not supported; using the native encoding instead')
     ''
   } else iconvlist()[idx]
+}
+
+# import functions from tools
+file_ext = tools::file_ext
+sans_ext = tools::file_path_sans_ext
+# substitute extension
+sub_ext = function(x, ext) {
+  if (grepl('\\.([[:alnum:]]+)$', x)) x = sans_ext(x)
+  paste(x, ext, sep = '.')
 }
