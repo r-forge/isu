@@ -1,5 +1,5 @@
 .onLoad = function(lib, pkg) {
-  if (R.version$`svn rev` >= 62130 && getRversion() >= '3.0.0') {
+  if (getRversion() >= '3.0.0') {
     tools::vignetteEngine(
       'knitr', weave = vweave, tangle = vtangle,
       pattern = c('[.][rRsS](nw|tex)$', '[.][Rr](md|html)$'), package = pkg
