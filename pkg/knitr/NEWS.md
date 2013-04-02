@@ -18,6 +18,10 @@
 
 - `knit()` and `knit2html()` gained a `quiet` argument to suppress messages and the progress bar (thanks, Vince Buffalo)
 
+- added the `text` argument to `spin()` and `stitch()` respectively as an alternative way to provide the input like `knit()` (#509) (thanks, Craig Watson)
+
+- `rst2pdf()` will pass a default output filename to `rst2pdf` (if the input is `foo.rst`, the output will be `foo.pdf`)
+
 ## BUG FIXES
 
 - fixed the problem reported in http://stackoverflow.com/q/12448507/559676 now \usepackage{upquote} should appear after \usepackage{fontenc}, so single quotes in verbatim environments will no longer cause problems
@@ -31,6 +35,10 @@
 - all child documents are inserted into the parent document as character strings of the (compiled) content, instead of being saved into files (e.g. `\input{foo-child.tex}`); no matter how many child documents there are, only one main output file will be generated; the package option `child.command` was removed accordingly since it is no longer used
 
 - no longer generates concordance data for child documents; the past attempt did not really work well and the implementation was complicated, so now we only support concordance for the main document; the consequence of this change is the synchronization between PDF and Rnw for child documents no longer works at the line level (clicking in PDF will still bring the focus back to the child chunk)
+
+- `knit2pdf()` and `knit2html()` return the output filename when the input is a file (in previous versions, `NULL` was returned in this case)
+
+- the package option `stop_on_error` is set to `2` now when building package vignettes, which means R will stop on errors in vignettes; this make it easier to find out possible problems in vignettes during `R CMD build`
 
 - the document hook `hook_rjournal()` was removed; it was too hackish (see http://yihui.name/en/2013/02/contribute-to-the-r-journal-with-lyx-knitr/ for how to write an article for The R Journal in a less hackish way)
 
