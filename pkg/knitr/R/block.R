@@ -69,8 +69,7 @@ block_exec = function(options) {
   }
 
   # eval chunks (in an empty envir if cache)
-  env = if (options$cache) new.env(parent = knit_global()) else knit_global()
-  .knitEnv$knit_env = env # make a copy of the envir
+  env = knit_global()
   obj.before = ls(globalenv(), all.names = TRUE)  # global objects before chunk
 
   keep = options$fig.keep
@@ -175,15 +174,16 @@ block_exec = function(options) {
     output = unlist(wrap(res, options)) # wrap all results together
     res.after = run_hooks(before = FALSE, options, env) # run 'after' hooks
   })
-  if (options$cache) copy_env(env, knit_global())
 
   output = str_c(c(res.before, output, res.after), collapse = '')  # insert hook results
   output = if (is_blank(output)) '' else knit_hooks$get('chunk')(output, options)
 
   if (options$cache) {
-    obj.after = ls(globalenv(), all.names = TRUE)  # figure out new global objs
-    copy_env(globalenv(), knit_global(), setdiff(obj.after, obj.before))
-    objs = ls(env, all.names = TRUE)
+    obj.new = setdiff(ls(globalenv(), all.names = TRUE), obj.before)
+    copy_env(globalenv(), env, obj.new)
+    objs = options$cache.vars %n% codetools::findLocalsList(parse_only(code))
+    # make sure all objects to be saved exist in env
+    objs = intersect(c(objs, obj.new), ls(env, all.names = TRUE))
     block_cache(options, output, objs)
     if (options$autodep) cache$objects(objs, code, options$label, options$cache.path)
   }
@@ -236,7 +236,7 @@ inline_exec = function(block, eval = opts_chunk$get('eval'), envir = knit_global
     res = if (eval) {
       (if (stop_on_error == 2L) identity else try)(
         {
-          v = withVisible(eval(parse(text = code[i], srcfile = NULL), envir = envir))
+          v = withVisible(eval(parse_only(code[i]), envir = envir))
           if (v$visible) v$value
         }
       )
@@ -268,7 +268,7 @@ process_tangle.block = function(x) {
   } else knit_code$get(label)
   # read external code if exists
   if (!isFALSE(ev) && length(code) && str_detect(code, 'read_chunk\\(.+\\)')) {
-    eval(parse(text = unlist(str_extract_all(code, 'read_chunk\\(([^)]+)\\)'))))
+    eval(parse_only(unlist(str_extract_all(code, 'read_chunk\\(([^)]+)\\)'))))
   }
   code = parse_chunk(code)
   if (isFALSE(ev)) code = comment_out(code, params$comment, newline = FALSE)
@@ -281,7 +281,7 @@ process_tangle.inline = function(x) {
   code = x$code
   if (length(code) == 0L || !any(idx <- str_detect(code, "knit_child\\(.+\\)")))
     return('')
-  str_c(str_c(sapply(code[idx], function(z) eval(parse(text = z))),
+  str_c(str_c(sapply(code[idx], function(z) eval(parse_only(z))),
               collapse = '\n'), '\n')
 }
 
