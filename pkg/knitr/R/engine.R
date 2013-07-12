@@ -47,27 +47,49 @@ engine_output = function(options, code, out, extra = NULL) {
 ## TODO: how to emulate the console?? e.g. for Python
 
 eng_interpreted = function(options) {
-  code = if (options$engine %in% c('highlight', 'Rscript', 'sas')) {
-    f = basename(tempfile(options$engine, '.', '.txt'))
-    writeLines(options$code, f)
+  engine = options$engine
+  code = if (engine %in% c('highlight', 'Rscript', 'sas')) {
+    f = basename(tempfile(engine, '.', switch(engine, sas = '.sas', Rscript = '.R', '.txt')))
+    # SAS runs code in example.sas and creates 'listing' file example.lst and log file example.log
+    writeLines(c(
+      if (engine == 'sas')
+        "OPTIONS NONUMBER NODATE PAGESIZE = MAX FORMCHAR = '|----|+|---+=|-/<>*' FORMDLIM=' ';",
+        options$code
+    ), f)
     on.exit(unlink(f))
+    if (engine == 'sas') {
+      saslst = sub('[.]sas$', '.lst', f)
+      on.exit(unlink(c(saslst, sub('[.]sas$', '.log', f))), add = TRUE)
+    }
     f
-  } else if (options$engine %in% c('haskell')) {
+  } else if (engine %in% c('haskell')) {
     # need multiple -e because the engine does not accept \n in code
     paste('-e', shQuote(options$code), collapse = ' ')
   } else paste(switch(
-    options$engine, bash = '-c', coffee = '-p -e', perl = '-e', python = '-c',
+    engine, bash = '-c', coffee = '-p -e', perl = '-e', python = '-c',
     ruby = '-e', sh = '-c', zsh = '-c', NULL
   ), shQuote(str_c(options$code, collapse = '\n')))
   # FIXME: for these engines, the correct order is options + code + file
-  code = if (options$engine %in% c('awk', 'gawk', 'sed'))
+  code = if (engine %in% c('awk', 'gawk', 'sed', 'sas'))
     paste(code, options$engine.opts) else paste(options$engine.opts, code)
-  cmd = paste(shQuote(options$engine.path %n% options$engine), code)
+  cmd = paste(shQuote(options$engine.path %n% engine), code)
   message('running: ', cmd)
   out = if (options$eval) system(cmd, intern = TRUE) else ''
+  if (options$eval && engine == 'sas' && file.exists(saslst))
+    out = c(readLines(saslst), out)
   engine_output(options, options$code, out)
 }
-## C
+
+## C (via R CMD SHLIB)
+eng_c = function(options) {
+  writeLines(options$code, f <- basename(tempfile('c', '.', '.c')))
+  on.exit(unlink(c(f, sub_ext(f, c('o', 'so', 'dll')))))
+  if (options$eval) {
+    out = system(paste('R CMD SHLIB', f), intern = TRUE)
+    dyn.load(sub('[.]c$', .Platform$dynlib.ext, f))
+  } else out = ''
+  engine_output(options, options$code, out)
+}
 
 ## Java
 
@@ -119,20 +141,42 @@ eng_tikz = function(options) {
   engine_output(options, options$code, '', extra)
 }
 
-## GraphViz (dot)
-eng_dot = function(options){
-  f = tempfile()
+## GraphViz (dot) and Asymptote are similar
+eng_dot = function(options) {
+
+  # create temporary file
+  f = tempfile('code', '.')
   writeLines(code <- options$code, f)
   on.exit(unlink(f))
-  cmd = sprintf('%s %s -T%s -o%s', shQuote(options$engine %n% options$engine.path),
+
+  # adapt command to either graphviz or asymptote
+  if (options$engine == 'dot') {
+    command_string = '%s %s -T%s -o%s'
+    syntax         = 'dot'
+  } else if (options$engine == 'asy') {
+    command_string = '%s %s -f %s -o %s'
+    syntax         = 'cpp'  # use cpp syntax for syntax highlighting
+  }
+
+  # prepare system command
+  cmd = sprintf(command_string, shQuote(options$engine %n% options$engine.path),
                 shQuote(f), ext <- options$fig.ext %n% dev2ext(options$dev),
                 shQuote(str_c(fig <- fig_path(), '.', ext)))
+
+  # generate output
   dir.create(dirname(fig), showWarnings = FALSE)
+  outf = str_c(fig, '.', ext)
+  unlink(outf)
   extra = if (options$eval) {
+    message('running: ', cmd)
     system(cmd)
+    if (!file.exists(outf)) stop('failed to compile content');
     options$fig.num = 1L; options$fig.cur = 1L
     knit_hooks$get('plot')(c(fig, ext), options)
   }
+
+  # wrap
+  options$engine = syntax
   engine_output(options, code, '', extra)
 }
 
@@ -142,7 +186,20 @@ eng_highlight = function(options) {
   if (is.null(options$engine.opts)) options$engine.opts = '-S text'
   options$engine.opts[1L] = paste('-f', options$engine.opts[1L])
   options$echo = FALSE; options$results = 'asis'  # do not echo source code
-  eng_interpreted(options)
+  res = eng_interpreted(options)
+  if (out_format('latex')) {
+    set_header(highlight.extra = paste(c(sprintf(
+      '\\let\\hl%s\\hlstd', c('esc', 'pps', 'lin')
+    ), '\\let\\hlslc\\hlcom'), collapse = ' '))
+    paste(color_def(options$background), '\\begin{kframe}',
+          sub('(.*)\\\\\\\\(.*)', '\\1\\2', res), '\\end{kframe}', sep = '')
+  } else res
+}
+
+## save the code
+eng_cat = function(options) {
+  do.call(cat, c(list(options$code, sep = '\n'), options$engine.opts))
+  ''
 }
 
 # set engines for interpreted languages
@@ -150,9 +207,12 @@ for (i in c('awk', 'bash', 'coffee', 'gawk', 'haskell', 'perl', 'python',
             'Rscript', 'ruby', 'sas', 'sed', 'sh', 'zsh')) {
   knit_engines$set(setNames(list(eng_interpreted), i))
 }
+rm(i)
+
 # additional engines
 knit_engines$set(
-  highlight = eng_highlight, Rcpp = eng_Rcpp, tikz = eng_tikz, dot = eng_dot
+  highlight = eng_highlight, Rcpp = eng_Rcpp, tikz = eng_tikz, dot = eng_dot,
+  c = eng_c, asy = eng_dot, cat = eng_cat
 )
 
 # possible values for engines (for auto-completion in RStudio)

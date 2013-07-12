@@ -3,7 +3,7 @@
 #' This function takes a specially formatted R script and converts it to a
 #' literate programming document. By default normal text (documentation) should
 #' be written after the roxygen comment (\code{#'}) and code chunk options are
-#' written after \code{#+} or \code{#-} or \code{# @@knitr}.
+#' written after \code{#+} or \code{#-} or \code{# ----}.
 #'
 #' Obviously the goat's hair is the original R script, and the wool is the
 #' literate programming document (ready to be knitted).
@@ -14,6 +14,7 @@
 #' @param text a character vector as an alternative way to \code{hair} to
 #'   provide the R source; if \code{text} is not \code{NULL}, \code{hair} will
 #'   be ignored
+#' @param envir the environment for \code{\link{knit}()} to evaluate the code
 #' @param format character: the output format (it takes five possible values);
 #'   the default is R Markdown
 #' @param doc a regular expression to identify the documentation lines; by
@@ -46,7 +47,7 @@
 #' spin(s, FALSE, format='Rhtml')
 #' spin(s, FALSE, format='Rtex')
 #' spin(s, FALSE, format='Rrst')
-spin = function(hair, knit = TRUE, report = TRUE, text = NULL,
+spin = function(hair, knit = TRUE, report = TRUE, text = NULL, envir = parent.frame(),
                 format = c('Rmd', 'Rnw', 'Rhtml', 'Rtex', 'Rrst'), doc = "^#+'[ ]?") {
 
   format = match.arg(format)
@@ -65,8 +66,8 @@ spin = function(hair, knit = TRUE, report = TRUE, text = NULL,
       # R code; #+/- indicates chunk options
       block = strip_white(block) # rm white lines in beginning and end
       if (!length(block)) next
-      if (any(opt <- str_detect(block, '^#+(\\+|-| @knitr)'))) {
-        block[opt] = str_c(p[1L], str_replace(block[opt], '^#+(\\+|-| @knitr)\\s*', ''), p[2L])
+      if (length(opt <- grep('^#+(\\+|-| ----+| @knitr)', block))) {
+        block[opt] = str_c(p[1L], gsub('^#+(\\+|-| ----+| @knitr)\\s*|-*\\s*$', '', block[opt]), p[2L])
       }
       if (!str_detect(block[1L], p1)) {
         block = c(str_c(p[1L], p[2L]), block)
@@ -87,10 +88,10 @@ spin = function(hair, knit = TRUE, report = TRUE, text = NULL,
   } else outsrc = NULL
   if (!knit) return(txt %n% outsrc)
   if (report) {
-    if (format == 'Rmd') return(knit2html(outsrc, text = txt))
-    if (!nosrc && (format %in% c('Rnw', 'Rtex'))) return(knit2pdf(outsrc))
+    if (format == 'Rmd') return(knit2html(outsrc, text = txt, envir = envir))
+    if (!nosrc && (format %in% c('Rnw', 'Rtex'))) return(knit2pdf(outsrc, envir = envir))
   }
-  knit(outsrc, text = txt)
+  knit(outsrc, text = txt, envir = envir)
 }
 
 .fmt.pat = list(
