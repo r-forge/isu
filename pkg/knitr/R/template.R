@@ -61,8 +61,8 @@ stitch = function(script,
 
   out = knit(input, output, envir = envir, text = txt)
   switch(file_ext(out), tex = {
-    texi2pdf(out, clean = TRUE)
-    message('PDF output at: ', str_replace(out, '\\.tex$', '.pdf'))
+    tools::texi2pdf(out, clean = TRUE)
+    message('PDF output at: ', sub_ext(out, 'pdf'))
   }, md = {
     out.html = sub_ext(out, 'html')
     markdown::markdownToHTML(out, out.html)
@@ -103,20 +103,20 @@ stitch_rmd = function(...) {
 #' @examples # see the knit_expand vignette
 #' if (interactive()) browseVignettes(package='knitr')
 knit_expand = function(file, ..., text = readLines(file, warn = FALSE),
-                       delim = c("{{", "}}") ){
+                       delim = c('{{', '}}') ){
 
   # check if delim is a pair, escaping regex as necessary
   if (length(delim) != 2L) stop('"delim" must be of length 2')
   delim = gsub('([.|()\\^{}+$*?]|\\[|\\])', '\\\\\\1', delim)
-  delim = str_c(delim[1L], '((.|\n)+?)', delim[2L])
+  delim = paste(delim[1L], '((.|\n)+?)', delim[2L], sep = '')
 
-  txt = str_c(text, collapse = '\n'); delim = perl(delim)
+  txt = paste(text, collapse = '\n'); delim = perl(delim)
   loc = str_locate_all(txt, delim)[[1L]]
   if (nrow(loc) == 0L) return(txt) # no match
   mat = str_extract_all(txt, delim)[[1L]]
-  mat = str_replace(mat, delim, '\\1')
+  mat = sub(delim, '\\1', mat)
   env = list(...)
   env = if (length(env)) list2env(env, parent = parent.frame()) else parent.frame()
   inline_exec(list(code = mat, input = txt, location = loc),
-              eval = TRUE, envir = env, stop_on_error = 2L, hook = identity)
+              eval = TRUE, envir = env, error = FALSE, hook = identity)
 }

@@ -37,8 +37,7 @@ check_dev = function(dev) {
 quartz_dev = function(type, dpi) {
   force(type); force(dpi)
   function(file, width, height, ...) {
-    quartz(file = file, width = width, height = height, type = type, dpi = dpi,
-           ...)
+    grDevices::quartz(file = file, width = width, height = height, type = type, dpi = dpi, ...)
   }
 }
 
@@ -51,7 +50,7 @@ tikz_dev = function(...) {
     xetex = getOption('tikzXelatexPackages'),
     luatex = getOption('tikzLualatexPackages')
   )
-  get('tikz', envir = as.environment('package:tikzDevice'))(
+  getFromNamespace('tikz', 'tikzDevice')(
     ..., packages = c('\n\\nonstopmode\n', packages, .knitEnv$tikzPackages)
   )
 }
@@ -59,22 +58,30 @@ tikz_dev = function(...) {
 ## save a recorded plot
 save_plot = function(plot, name, dev, width, height, ext, dpi, options) {
 
-  path = str_c(name, ".", ext)
+  path = paste(name, ext, sep = '.')
+  # when cache=2 and plot file exists, just return the filename
+  if (options$cache == 2 && cache$exists(options$hash)) {
+    if (!file.exists(path)) {
+      purge_cache(options)
+      stop('cannot find ', path, '; the cache has been purged; please re-compile')
+    }
+    return(c(name, if (dev == 'tikz' && options$external) 'pdf' else ext))
+  }
 
   ## built-in devices
   device = switch(
     dev,
-    bmp = function(...) bmp(...,  res = dpi, units = "in"),
+    bmp = function(...) bmp(...,  res = dpi, units = 'in'),
     postscript = function(...) {
-      postscript(..., onefile = FALSE, horizontal = FALSE, paper = "special")
+      postscript(..., onefile = FALSE, horizontal = FALSE, paper = 'special')
     },
-    jpeg = function(...) jpeg(..., res = dpi, units = "in"),
+    jpeg = function(...) jpeg(..., res = dpi, units = 'in'),
     pdf = grDevices::pdf,
-    png = function(...) png(..., res = dpi, units = "in"),
+    png = function(...) png(..., res = dpi, units = 'in'),
     svg = grDevices::svg,
     pictex = grDevices::pictex,
-    tiff = function(...) tiff(..., res = dpi, units = "in"),
-    win.metafile = function(...) win.metafile(...),
+    tiff = function(...) tiff(..., res = dpi, units = 'in'),
+    win.metafile = grDevices::win.metafile,
     cairo_pdf = grDevices::cairo_pdf,
     cairo_ps = grDevices::cairo_ps,
 
@@ -117,17 +124,17 @@ save_plot = function(plot, name, dev, width, height, ext, dpi, options) {
 
   ## compile tikz to pdf
   if (dev == 'tikz' && options$external) {
-    unlink(pdf.plot <- str_c(name, '.pdf'))
+    unlink(pdf.plot <- paste(name, '.pdf', sep = ''))
     owd = setwd(dirname(path))
     # add old wd to TEXINPUTS (see #188)
     oti = Sys.getenv('TEXINPUTS'); on.exit(Sys.setenv(TEXINPUTS = oti))
-    Sys.setenv(TEXINPUTS = str_c(owd, oti, sep = ':'))
-    system(str_c(switch(getOption("tikzDefaultEngine"),
+    Sys.setenv(TEXINPUTS = paste(owd, oti, sep = ':'))
+    system(paste(switch(getOption('tikzDefaultEngine'),
                         pdftex = getOption('tikzLatex'),
-                        xetex = getOption("tikzXelatex"),
-                        luatex = getOption("tikzLualatex"),
-                        stop("a LaTeX engine must be specified for tikzDevice",
-                             call. = FALSE)), shQuote(basename(path)), sep = ' '),
+                        xetex = getOption('tikzXelatex'),
+                        luatex = getOption('tikzLualatex'),
+                        stop('a LaTeX engine must be specified for tikzDevice',
+                             call. = FALSE)), shQuote(basename(path))),
            ignore.stdout = TRUE)
     setwd(owd)
     if (file.exists(pdf.plot)) ext = 'pdf' else {
@@ -140,8 +147,7 @@ save_plot = function(plot, name, dev, width, height, ext, dpi, options) {
 
 ## this is mainly for Cairo and cairoDevice
 load_device = function(name, package, dpi = NULL) {
-  do.call('library', list(package = package))
-  dev = get(name, envir = as.environment(str_c('package:', package)))
+  dev = getFromNamespace(name, package)
   ## dpi is for bitmap devices; units must be inches!
   if (is.null(dpi)) dev else function(...) dev(..., dpi = dpi, units = 'in')
 }
@@ -187,4 +193,64 @@ reduce_plot_opts = function(options) {
   fig.cur = options$fig.cur
   for (i in .recyle.opts) options[[i]] = options[[i]][fig.cur]
   options
+}
+
+# the memory address of a NativeSymbolInfo object will be lost if it is saved to
+# disk; see http://markmail.org/message/zat2r2pfsvhrsfqz for the full
+# discussion; the hack below was stolen (with permission) from RStudio:
+# https://github.com/rstudio/rstudio/blob/master/src/cpp/r/R/Tools.R
+fix_recordedPlot = function(plot) {
+  # restore native symbols for R >= 3.0
+  if (Rversion >= '3.0.0') {
+    for (i in seq_along(plot[[1]])) {
+      # get the symbol then test if it's a native symbol
+      symbol = plot[[1]][[i]][[2]][[1]]
+      if (inherits(symbol, 'NativeSymbolInfo')) {
+        # determine the dll that the symbol lives in
+        name = symbol[[if (is.null(symbol$package)) 'dll' else 'package']][['name']]
+        pkgDLL = getLoadedDLLs()[[name]]
+        # reconstruct the native symbol and assign it into the plot
+        nativeSymbol = getNativeSymbolInfo(
+          name = symbol$name, PACKAGE = pkgDLL, withRegistrationInfo = TRUE
+        )
+        plot[[1]][[i]][[2]][[1]] <- nativeSymbol
+      }
+    }
+  } else if (Rversion >= '2.14') {
+    # restore native symbols for R >= 2.14
+    try({
+      for(i in seq_along(plot[[1]])) {
+        if(inherits(plot[[1]][[i]][[2]][[1]], 'NativeSymbolInfo')) {
+          nativeSymbol = getNativeSymbolInfo(plot[[1]][[i]][[2]][[1]]$name)
+          plot[[1]][[i]][[2]][[1]] = nativeSymbol
+        }
+      }
+    }, silent = TRUE)
+  }
+  plot
+}
+
+# fix plots in evaluate() results
+fix_evaluate = function(list, fix = TRUE) {
+  if (!fix) return(list)
+  lapply(list, function(x) {
+    if (is.recordedplot(x)) fix_recordedPlot(x) else x
+  })
+}
+
+# remove the plots from the evaluate results for the case of cache=2; if we only
+# want to keep high-level plots, we need MD5 digests of the plot components so
+# that we will be able to filter out low-level changes later
+remove_plot = function(list, keep.high = TRUE) {
+  lapply(list, function(x) {
+    if (is.recordedplot(x)) structure(
+      if (keep.high) digest_plot(x) else NULL, class = 'recordedplot'
+    ) else x
+  })
+}
+# replace the content of the recorded plot with MD5 digests so that merge_plot()
+# will still work, and this will also save disk space for the case of cache=2
+digest_plot = function(x, level = 1) {
+  if (!is.list(x) || level >= 3) return(digest::digest(x))
+  lapply(x, digest_plot, level = level + 1)
 }

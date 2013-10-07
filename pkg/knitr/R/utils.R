@@ -20,7 +20,7 @@ chunk_counter = knit_counter(1L)
 ## a vectorized and better version than evaluate:::line_prompt
 line_prompt = function(x, prompt = getOption('prompt'), continue = getOption('continue')) {
   # match a \n, then followed by any character (use zero width assertion)
-  str_c(prompt, gsub('(?<=\n)(?=.|\n)', continue, x, perl = TRUE))
+  paste(prompt, gsub('(?<=\n)(?=.|\n)', continue, x, perl = TRUE), sep = '')
 }
 
 ## add a prefix to output
@@ -28,7 +28,7 @@ comment_out = function(x, prefix = '##', which = TRUE, newline = TRUE) {
   x = gsub('[\n]{2,}$', '\n', x)
   if (newline) x = gsub('([^\n])$', '\\1\n', x)  # add \n if not exists
   if (is.null(prefix) || !nzchar(prefix) || is.na(prefix)) return(x)
-  prefix = str_c(prefix, ' ')
+  prefix = paste(prefix, '')
   x = gsub(' +([\n]*)$', '\\1', x)
   x[which] = line_prompt(x[which], prompt = prefix, continue = prefix)
   x
@@ -36,19 +36,19 @@ comment_out = function(x, prefix = '##', which = TRUE, newline = TRUE) {
 
 ## assign string in comments to a global variable
 comment_to_var = function(x, varname, pattern, envir) {
-  if (str_detect(x, pattern)) {
-    assign(varname, str_replace(x, pattern, ''), envir = envir)
+  if (grepl(pattern, x)) {
+    assign(varname, sub(pattern, '', x), envir = envir)
     return(TRUE)
   }
   FALSE
 }
 
 is_blank = function(x) {
-  if (length(x)) all(str_detect(x, '^\\s*$')) else TRUE
+  if (length(x)) all(grepl('^\\s*$', x)) else TRUE
 }
 valid_path = function(prefix, label) {
   if (length(prefix) == 0L || is.na(prefix) || prefix == 'NA') prefix = ''
-  str_c(prefix, label)
+  paste(prefix, label, sep = '')
 }
 
 ## define a color variable in TeX
@@ -80,10 +80,10 @@ set_preamble = function(input, patterns = knit_patterns$get()) {
   if (!out_format('latex')) return()
   if (length(db <- patterns$document.begin) != 1L) return()  # no \begin{document} pattern
   if (length(hb <- patterns$header.begin) != 1L) return()  # no \documentclass{} pattern
-  idx2 = str_detect(input, db)
+  idx2 = grepl(db, input)
   if (!any(idx2)) return()
   if ((idx2 <- which(idx2)[1]) < 2L) return()
-  txt = str_c(input[seq_len(idx2 - 1L)], collapse = '\n')  # rough preamble
+  txt = paste(input[seq_len(idx2 - 1L)], collapse = '\n')  # rough preamble
   idx = str_locate(txt, hb)  # locate documentclass
   if (any(is.na(idx))) return()
   options(tikzDocumentDeclaration = str_sub(txt, idx[, 1L], idx[, 2L]))
@@ -150,7 +150,7 @@ input_dir = function() .knitEnv$input.dir %n% '.'
 ## scientific notation in TeX, HTML and reST
 format_sci_one = function(x, format = 'latex') {
 
-  if (!is.double(x) || is.na(x) || x == 0) return(as.character(x))
+  if (!is.numeric(x) || !is.double(x) || is.na(x) || x == 0) return(as.character(x))
 
   if (abs(lx <- floor(log10(abs(x)))) < getOption('scipen') + 4L)
     return(as.character(round(x, getOption('digits')))) # no need sci notation
@@ -159,8 +159,7 @@ format_sci_one = function(x, format = 'latex') {
   b[b %in% c(1, -1)] = ''
 
   switch(format, latex = {
-    s = sci_notation('%s%s10^{%s}', b, '\\times ', lx)
-    sprintf('\\ensuremath{%s}', s)
+    sci_notation('%s%s10^{%s}', b, '\\times ', lx)
   }, html = sci_notation('%s%s10<sup>%s</sup>', b, ' &times; ', lx), rst = {
     # if AsIs, use the :math: directive
     if (inherits(x, 'AsIs')) {
@@ -195,13 +194,18 @@ is_tikz_dev = function(options) {
 }
 
 tikz_dict = function(path) {
-  str_c(sans_ext(basename(path)), '-tikzDictionary')
+  paste(sans_ext(basename(path)), 'tikzDictionary', sep = '-')
 }
 
 ## compatibility with Sweave and old beta versions of knitr
 fix_options = function(options) {
   # if you want to use subfloats, fig.show must be 'hold'
   if (length(options$fig.subcap)) options$fig.show = 'hold'
+
+  # cache=TRUE -> 3; FALSE -> 0
+  if (is.logical(options$cache)) options$cache = options$cache * 3
+  # non-R code should not use cache=1,2
+  if (options$engine != 'R') options$cache = (options$cache > 0) * 3
 
   ## deal with aliases: a1 is real option; a0 is alias
   if (length(a1 <- opts_knit$get('aliases')) && length(a0 <- names(a1))) {
@@ -214,16 +218,8 @@ fix_options = function(options) {
   options
 }
 
-## parse but do not keep source
-parse_only = if (getRversion() >= '3.0.0') {
-  function(code) parse(text = code, keep.source = FALSE)
-} else function(code) parse(text = code, srcfile = NULL)
-
-## try eval an option (character) to its value
-eval_opt = function(x) {
-  if (!is.character(x)) return(x)
-  eval(parse_only(x), envir = knit_global())
-}
+# parse but do not keep source
+parse_only = formatR:::parse_only
 
 ## eval options as symbol/language objects
 eval_lang = function(x, envir = knit_global()) {
@@ -236,7 +232,7 @@ isFALSE = function(x) identical(x, FALSE)
 
 ## check latex packages; if not exist, copy them over to ./
 test_latex_pkg = function(name, path) {
-  res = try(system(sprintf('kpsewhich %s.sty', name), intern = TRUE), silent = TRUE)
+  res = try(system(sprintf('%s %s.sty', kpsewhich(), name), intern = TRUE), silent = TRUE)
   if (inherits(res, 'try-error') || !length(res)) {
     warning("unable to find LaTeX package '", name, "'; will use a copy from knitr")
     file.copy(path, '.')
@@ -280,16 +276,16 @@ fig_path = function(suffix = '', options = opts_current$get()) {
 }
 # sanitize filename for LaTeX
 sanitize_fn = function(path, suffix = '') {
-  if (str_detect(path, '[^~:_./\\[:alnum:]-]')) {
+  if (grepl('[^~:_./\\[:alnum:]-]', path)) {
     warning('replaced special characters in figure filename "', path, '" -> "',
-            path <- str_replace_all(path, '[^~:_./\\[:alnum:]-]', '_'), '"')
+            path <- gsub('[^~:_./\\[:alnum:]-]', '_', path), '"')
   }
   # replace . with _ except ../ and ./
   s = str_split(path, '[/\\]')[[1L]]
-  i = (s != '.') & (s != '..') & str_detect(s, '\\.')
+  i = (s != '.') & (s != '..') & grepl('\\.', s)
   if (any(i)) {
-    s[i] = str_replace_all(s[i], '\\.', '_')
-    path = str_c(s, collapse = '/')
+    s[i] = gsub('\\.', '_', s[i])
+    path = paste(s, collapse = '/')
     warning('dots in figure paths replaced with _ ("', path, '")')
   }
   str_c(path, suffix)
@@ -375,13 +371,7 @@ escape_latex = function(x, newlines = FALSE, spaces = FALSE) {
 }
 
 # escape special HTML chars
-escape_html = function(x) {
-  x = gsub('&', '&amp;', x)
-  x = gsub('<', '&lt;', x)
-  x = gsub('>', '&gt;', x)
-  x = gsub('"', '&quot;', x)
-  x
-}
+escape_html = highr:::escape_html
 
 #' Read source code from R-Forge
 #'
@@ -502,4 +492,23 @@ wrap_rmd = function(file, width = 80, text = NULL, backup) {
     if (!is.null(backup)) file.copy(file, backup, overwrite = TRUE)
     writeLines(txt, file)
   } else txt
+}
+
+# change the default device to an appropriate device when the output is html
+# (e.g. markdown, reST, AsciiDoc)
+set_html_dev = function() {
+  # only change if device is pdf, because pdf does not work for html
+  if (!identical(opts_chunk$get('dev'), 'pdf')) return()
+  # in some cases, png() does not work (e.g. options('bitmapType') == 'Xlib' on
+  # headless servers); use svg then
+  opts_chunk$set(dev = if (inherits(try({
+    png(tempfile()); dev.off()
+  }, silent = TRUE), 'try-error')) 'svg' else 'png')
+}
+
+# locate kpsewhich especially for Mac OS because /usr/texbin may not be in PATH
+kpsewhich = function() {
+  if (Sys.info()['sysname'] != 'Darwin' || !file.exists(x <- '/usr/texbin/kpsewhich')
+      || nzchar(Sys.which('kpsewhich')))
+    'kpsewhich' else x
 }

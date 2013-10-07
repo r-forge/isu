@@ -11,7 +11,7 @@ new_cache = function() {
   }
 
   cache_purge = function(hash) {
-    for (h in hash) unlink(str_c(cache_path(h), c('.rdb', '.rdx', '.RData')))
+    for (h in hash) unlink(paste(cache_path(h), c('rdb', 'rdx', 'RData'), sep = '.'))
   }
 
   cache_save = function(keys, outname, hash) {
@@ -22,18 +22,20 @@ new_cache = function() {
       copy_env(globalenv(), knit_global(), '.Random.seed')
       outname = c('.Random.seed', outname)
     }
-    save(list = outname, file = str_c(path, '.RData'), envir = knit_global())
+    save(list = outname, file = paste(path, 'RData', sep = '.'), envir = knit_global())
     # random seed is always load()ed
     keys = setdiff(keys, '.Random.seed')
-    tools:::makeLazyLoadDB(knit_global(), path, variables = keys)
+    getFromNamespace('makeLazyLoadDB', 'tools')(knit_global(), path, variables = keys)
   }
 
   save_objects = function(objs, label, path) {
+    if (length(objs) == 0L) objs = ''
     ## save object names
-    x = str_c(c(label, objs), collapse = '\t')
+    x = paste(c(label, objs), collapse = '\t')
     if (file.exists(path)) {
       lines = readLines(path)
-      idx = substr(lines, 1L, nchar(label)) == label
+      lines = lines[lines != label] # knitr < 1.5 may have lines == label
+      idx = substr(lines, 1L, nchar(label) + 1L) == paste(label, '\t', sep = '')
       if (any(idx)) {
         lines[idx] = x  # update old objects
       } else lines = c(lines, x)
@@ -51,7 +53,7 @@ new_cache = function() {
     if (!is_abs_path(path)) path = file.path(getwd(), path)
     lazyLoad(path, envir = knit_global())
     # load output from last run if exists
-    if (file.exists(path2 <- str_c(path, '.RData'))) {
+    if (file.exists(path2 <- paste(path, 'RData', sep = '.'))) {
       load(path2, envir = knit_global())
       if (exists('.Random.seed', envir = knit_global()))
         copy_env(knit_global(), globalenv(), '.Random.seed')
@@ -73,14 +75,14 @@ new_cache = function() {
   }
 
   cache_exists = function(hash) {
-    all(file.exists(str_c(cache_path(hash), c('.rdb', '.rdx'))))
+    is.character(hash) &&
+      all(file.exists(paste(cache_path(hash), c('rdb', 'rdx'), sep = '.')))
   }
 
-  ## code output is stored in .[hash], so cache=TRUE won't lose output as cacheSweave does
-  cache_output = function(hash) {
-    if (exists(str_c('.', hash), envir = knit_global(), mode = 'character')) {
-      get(str_c('.', hash), envir = knit_global(), mode = 'character')
-    } else ''
+  # when cache=3, code output is stored in .[hash], so cache=TRUE won't lose
+  # output as cacheSweave does; for cache=1,2, output is the evaluate() list
+  cache_output = function(hash, mode = 'character') {
+    get(sprintf('.%s', hash), envir = knit_global(), mode = mode, inherits = FALSE)
   }
 
   list(purge = cache_purge, save = cache_save, load = cache_load, objects = cache_objects,
@@ -124,15 +126,18 @@ dep_auto = function(path = opts_chunk$get('cache.path')) {
   if (is.null(locals) || is.null(globals)) return(invisible(NULL))
   if (!identical(names(locals), names(globals))) {
     warning('corrupt dependency files? \ntry remove ',
-            str_c(paths, collapse = '; '))
+            paste(paths, collapse = '; '))
     return(invisible(NULL))
   }
   nms = intersect(names(knit_code$get()), names(locals)) # guarantee correct order
+  # locals may contain old chunk names; the intersection can be of length < 2
+  if (length(nms) < 2) return(invisible(NULL))
   for (i in 2:length(nms)) {
+    if (length(g <- globals[[nms[i]]]) == 0) next
     for (j in 1:(i - 1L)) {
       ## check if current globals are in old locals
-      if (length(globals[[nms[i]]]) && any(globals[[nms[i]]] %in% locals[[nms[j]]]))
-        dep_list$set(setNames(list(c(dep_list$get(nms[j]), nms[i])), nms[j]))
+      if (any(g %in% locals[[nms[j]]]))
+        dep_list$set(setNames(list(unique(c(dep_list$get(nms[j]), nms[i]))), nms[j]))
     }
   }
 }
@@ -141,7 +146,7 @@ parse_objects = function(path) {
   if (!file.exists(path)) {
     warning('file ', path, ' not found'); return()
   }
-  lines = str_split(readLines(path), '\t')
+  lines = strsplit(readLines(path), '\t')
   if (length(lines) < 2L) return()  # impossible for dependson
   objs = lapply(lines, `[`, -1L)
   names(objs) = lapply(lines, `[`, 1L)

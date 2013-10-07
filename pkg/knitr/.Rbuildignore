@@ -14,5 +14,6 @@ png$
 NEWS.md
 ^\.Rproj\.user$
 ^.*\.Rproj$
-^Makefile$
 .travis.yml
+FAQ.md
+Makefile

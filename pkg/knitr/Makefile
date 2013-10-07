@@ -32,8 +32,8 @@ examples:
 	cd inst/examples;\
 	Rscript knit-all.R
 
-vignettes:
-	cd inst/doc;\
+vignettes: vignettes/knitr-intro.lyx vignettes/knitr-refcard.lyx
+	cd vignettes;\
 	lyx -e knitr knitr-intro.lyx;\
 	lyx -e knitr knitr-refcard.lyx
 

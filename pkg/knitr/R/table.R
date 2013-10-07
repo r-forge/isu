@@ -4,9 +4,9 @@
 #' intended to replace any other R packages for making tables.
 #' @param x an R object (typically a matrix or data frame)
 #' @param format a character string; possible values are \code{latex},
-#'   \code{html}, \code{markdown} and \code{rst}; this will be automatically
-#'   determined if the function is called within \pkg{knitr}; it can also be set
-#'   in the global option \code{knitr.table.format}
+#'   \code{html}, \code{markdown}, \code{pandoc}, and \code{rst}; this will be
+#'   automatically determined if the function is called within \pkg{knitr}; it
+#'   can also be set in the global option \code{knitr.table.format}
 #' @param digits the maximum number of digits for numeric columns (passed to
 #'   \code{round()})
 #' @param row.names whether to include row names; by default, row names are
@@ -20,6 +20,9 @@
 #' @return A character vector of the table source code. When \code{output =
 #'   TRUE}, the results are also written into the console as a side-effect.
 #' @seealso Other R packages such as \pkg{xtable} and \pkg{tables}.
+#' @note The tables for \code{format = 'markdown'} also work for Pandoc when the
+#'   \code{pipe_tables} extension is enabled (this is the default behavior for
+#'   Pandoc >= 1.10).
 #' @export
 #' @examples kable(head(iris), format = 'latex')
 #' kable(head(iris), format = 'html')
@@ -57,6 +60,7 @@ kable = function(x, format, digits = getOption('digits'), row.names = NA,
     align = ifelse(isn, 'r', 'l')
   # rounding
   x = apply(x, 2, function(z) if (is.numeric(z)) format(round(z, digits)) else z)
+  if (is.null(dim(x))) x = t(as.matrix(x))  # damn it!
   if (is.na(row.names))
     row.names = !is.null(rownames(x)) && !identical(rownames(x), as.character(seq_len(NROW(x))))
   if (row.names) {
@@ -72,19 +76,24 @@ kable = function(x, format, digits = getOption('digits'), row.names = NA,
   invisible(res)
 }
 
-kable_latex = function(x, booktabs = FALSE, longtable = FALSE) {
+kable_latex = function(
+  x, booktabs = FALSE, longtable = FALSE,
+  vline = if (booktabs) '' else '|',
+  toprule = if (booktabs) '\\toprule' else '\\hline',
+  bottomrule = if (booktabs) '\\bottomrule' else '\\hline'
+) {
   if (!is.null(align <- attr(x, 'align'))) {
-    align = paste(align, collapse = if (booktabs) '' else '|')
+    align = paste(align, collapse = vline)
     align = paste('{', align, '}', sep = '')
   }
 
   paste(c(
-    sprintf('\\begin{%s}', if (longtable) 'longtable' else 'tabular'), align,
-    sprintf('\n%s\n', if (booktabs) '\\toprule' else '\\hline'),
+    sprintf('\n\\begin{%s}', if (longtable) 'longtable' else 'tabular'), align,
+    sprintf('\n%s', toprule), '\n',
     paste(c(if (!is.null(cn <- colnames(x))) paste(cn, collapse = ' & '),
             apply(x, 1, paste, collapse = ' & ')),
           collapse = sprintf('\\\\\n%s\n', if (booktabs) '\\midrule' else '\\hline')),
-    '\\\\\n', if (booktabs) '\\bottomrule' else '\\hline',
+    sprintf('\\\\\n%s', bottomrule),
     sprintf('\n\\end{%s}', if (longtable) 'longtable' else 'tabular')
   ), collapse = '')
 }
@@ -116,9 +125,12 @@ kable_html = function(x, table.attr = '') {
 #'   before the header, after the header and at the end of the table,
 #'   respectively
 #' @param sep.col the column separator
+#' @param align.fun a function to process the separator under the header
+#'   according to alignment
 #' @return A character vector of the table content.
 #' @noRd
-kable_mark = function(x, sep.row = c('=', '=', '='), sep.col = '  ') {
+kable_mark = function(x, sep.row = c('=', '=', '='), sep.col = '  ',
+                      align.fun = function(s, a) s) {
   l = apply(x, 2, function(z) max(nchar(z), na.rm = TRUE))
   cn = colnames(x)
   if (!is.null(cn)) {
@@ -127,7 +139,8 @@ kable_mark = function(x, sep.row = c('=', '=', '='), sep.col = '  ') {
   }
   if (!is.null(align <- attr(x, 'align'))) l = l + 2
   s = sapply(l, function(i) paste(rep(sep.row[2], i), collapse = ''))
-  res = rbind(if (!is.na(sep.row[1])) s, cn, s, x, if (!is.na(sep.row[3])) s)
+  res = rbind(if (!is.na(sep.row[1])) s, cn, align.fun(s, align),
+              x, if (!is.na(sep.row[3])) s)
   apply(mat_pad(res, l, align), 1, paste, collapse = sep.col)
 }
 
@@ -136,7 +149,15 @@ kable_rst = kable_mark
 # actually R Markdown
 kable_markdown = function(x) {
   if (is.null(colnames(x))) stop('the table must have a header (column names)')
-  kable_mark(x, c(NA, '-', NA), ' | ')
+  res = kable_mark(x, c(NA, '-', NA), '|', align.fun = function(s, a) {
+    if (is.null(a)) return(s)
+    r = c(l = '^.', c = '^.|.$', r = '.$')
+    for (i in seq_along(s)) {
+      s[i] = gsub(r[a[i]], ':', s[i])
+    }
+    s
+  })
+  sprintf('|%s|', res)
 }
 
 kable_pandoc = function(x) {

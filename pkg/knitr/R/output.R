@@ -69,8 +69,8 @@
 #'   recursively. See \code{\link{knit_child}}.
 #'
 #'   The working directory when evaluating R code chunks is the directory of the
-#'   input document by default, so if the R code involves with external files
-#'   (like \code{read.table()}), it is better to put these files under the same
+#'   input document by default, so if the R code involves external files (like
+#'   \code{read.table()}), it is better to put these files under the same
 #'   directory of the input document so that we can use relative paths. However,
 #'   it is possible to change this directory with the package option
 #'   \code{\link{opts_knit}$set(root.dir = ...)} so all paths in code chunks are
@@ -115,7 +115,7 @@ knit = function(input, output = NULL, tangle = FALSE, text = NULL, quiet = FALSE
     setwd(opts_knit$get('output.dir')) # always restore original working dir
     # in child mode, input path needs to be adjusted
     if (in.file && !is_abs_path(input)) {
-      input = str_c(opts_knit$get('child.path'), input)
+      input = paste(opts_knit$get('child.path'), input, sep = '')
       input = file.path(input_dir(), input)
     }
   } else {
@@ -124,9 +124,10 @@ knit = function(input, output = NULL, tangle = FALSE, text = NULL, quiet = FALSE
     opts_knit$set(output.dir = getwd()) # record working directory in 1st run
     knit_log$restore()
     on.exit(chunk_counter(reset = TRUE), add = TRUE) # restore counter
+    adjust_opts_knit()
     ## turn off fancy quotes, use smaller digits/width, warn immediately
     oopts = options(
-      useFancyQuotes = FALSE, digits = 4L, warn = 1L, width = getOption('KNITR_WIDTH', 75L),
+      useFancyQuotes = FALSE, digits = 4L, warn = 1L, width = opts_knit$get('width'),
       knitr.in.progress = TRUE,
       device = function(width = 7, height = 7, ...) pdf(NULL, width, height, ...)
     )
@@ -136,10 +137,8 @@ knit = function(input, output = NULL, tangle = FALSE, text = NULL, quiet = FALSE
     ocode = knit_code$get(); on.exit(knit_code$restore(ocode), add = TRUE)
     if (tangle) knit_code$restore() # clean up code before tangling
     optk = opts_knit$get(); on.exit(opts_knit$set(optk), add = TRUE)
-    # use the option KNITR_PROGRESS to control the progress bar
-    opts_knit$set(
-      tangle = tangle, encoding = encoding,
-      progress = opts_knit$get('progress') && getOption('KNITR_PROGRESS', TRUE) && !quiet
+    opts_knit$set(tangle = tangle, encoding = encoding,
+                  progress = opts_knit$get('progress') && !quiet
     )
   }
 
@@ -252,7 +251,7 @@ process_file = function(text, output) {
       error = function(e) {
         cat(res, sep = '\n', file = output %n% '')
         message(
-          'Quitting from lines ', str_c(current_lines(i), collapse = '-'),
+          'Quitting from lines ', paste(current_lines(i), collapse = '-'),
           ' (', knit_concord$get('infile'), ') '
         )
       }
@@ -269,13 +268,13 @@ process_file = function(text, output) {
 
 auto_out_name = function(input, ext = tolower(file_ext(input))) {
   base = sans_ext(input)
-  if (opts_knit$get('tangle')) return(str_c(base, '.R'))
-  if (ext %in% c('rnw', 'snw')) return(str_c(base, '.tex'))
-  if (ext %in% c('rmd', 'rmarkdown', 'rhtml', 'rhtm', 'rtex', 'stex', 'rrst'))
-    return(str_c(base, '.', substring(ext, 2L)))
-  if (grepl('_knit_', input)) return(sub('_knit_', '', input))
-  if (ext != 'txt') return(str_c(base, '.txt'))
-  str_c(base, '-out.', ext)
+  name = if (opts_knit$get('tangle')) c(base, '.R') else
+    if (ext %in% c('rnw', 'snw')) c(base, '.tex') else
+      if (ext %in% c('rmd', 'rmarkdown', 'rhtml', 'rhtm', 'rtex', 'stex', 'rrst'))
+        c(base, '.', substring(ext, 2L)) else
+          if (grepl('_knit_', input)) sub('_knit_', '', input) else
+            if (ext != 'txt') c(base, '.txt') else c(base, '-out.', ext)
+  paste(name, collapse = '')
 }
 
 ## decide output format based on file extension
@@ -303,7 +302,10 @@ auto_format = function(ext) {
 #' option \code{child} and serves as the alternative to the
 #' \command{SweaveInput} command in Sweave.
 #' @param ... arguments passed to \code{\link{knit}}
-#' @param eval logical: whether to evaluate the child document
+#' @param options a list of chunk options to be used as global options inside
+#'   the child document (ignored if not a list); when we use the \code{child}
+#'   option in a parent chunk, the chunk options of the parent chunk will be
+#'   passed to the \code{options} argument here
 #' @return A character string of the content of the compiled child document is
 #'   returned as a character string so it can be written back to the parent
 #'   document directly.
@@ -317,11 +319,21 @@ auto_format = function(ext) {
 #' @examples ## you can write \Sexpr{knit_child('child-doc.Rnw')} in an Rnw file 'main.Rnw' to input results from child-doc.Rnw in main.tex
 #'
 #' ## comment out the child doc by \Sexpr{knit_child('child-doc.Rnw', eval = FALSE)}
-knit_child = function(..., eval = TRUE) {
-  if (!eval) return('')
+knit_child = function(..., options = NULL) {
   child = child_mode()
   opts_knit$set(child = TRUE) # yes, in child mode now
   on.exit(opts_knit$set(child = child)) # restore child status
+  if (is.list(options)) {
+    options$label = options$child = NULL  # do not need to pass the parent label on
+    if (length(options)) {
+      optc = opts_chunk$get(names(options), drop = FALSE); opts_chunk$set(options)
+      # if user did not touch opts_chunk$set() in child, restore the chunk option
+      on.exit({
+        for (i in names(options)) if (identical(options[[i]], opts_chunk$get(i)))
+          opts_chunk$set(optc[i])
+      }, add = TRUE)
+    }
+  }
   res = knit(..., tangle = opts_knit$get('tangle'),
              encoding = opts_knit$get('encoding') %n% getOption('encoding'))
   paste(c('', res), collapse = '\n')
@@ -356,6 +368,7 @@ knit_log = new_defaults()  # knitr log for errors, warnings and messages
 #' @param options list of options used to control output
 #' @noRd
 #' @S3method wrap list
+#' @S3method wrap default
 #' @S3method wrap character
 #' @S3method wrap source
 #' @S3method wrap warning
@@ -363,7 +376,7 @@ knit_log = new_defaults()  # knitr log for errors, warnings and messages
 #' @S3method wrap error
 #' @S3method wrap recordedplot
 wrap = function(x, options = list()) {
-  UseMethod("wrap", x)
+  UseMethod('wrap', x)
 }
 
 wrap.list = function(x, options = list()) {
@@ -371,21 +384,22 @@ wrap.list = function(x, options = list()) {
   lapply(x, wrap, options)
 }
 
+# ignore unknown classes
+wrap.default = function(x, options) return()
+
 wrap.character = function(x, options) {
   if (!output_asis(x, options)) x = comment_out(x, options$comment)
   knit_hooks$get('output')(x, options)
 }
 
 wrap.source = function(x, options) {
-  src = str_replace(x$src, '\n$', '')
-  src = hilight_source(src, out_format(), options)
-  src = str_c(c(src, ''), collapse = '\n')
+  src = sub('\n$', '', x$src)
   knit_hooks$get('source')(src, options)
 }
 
 msg_wrap = function(message, type, options) {
   # when output format is latex, do not wrap messages (let latex deal with wrapping)
-  if (!out_format(c('latex', 'listings', 'sweave')))
+  if (!length(grep('\n', message)) && !out_format(c('latex', 'listings', 'sweave')))
     message = str_wrap(message, width = getOption('width'))
   knit_log$set(setNames(
     list(c(knit_log$get(type), str_c('Chunk ', options$label, ':\n  ', message))),
@@ -395,7 +409,7 @@ msg_wrap = function(message, type, options) {
 }
 
 wrap.warning = function(x, options) {
-  msg_wrap(paste("Warning:", x$message, collapse = '\n'), 'warning', options)
+  msg_wrap(paste('Warning:', x$message, collapse = '\n'), 'warning', options)
 }
 
 wrap.message = function(x, options) {
@@ -403,7 +417,7 @@ wrap.message = function(x, options) {
 }
 
 wrap.error = function(x, options) {
-  msg_wrap(str_c("Error: ", x$message), 'error', options)
+  msg_wrap(str_c('Error: ', x$message), 'error', options)
 }
 
 wrap.recordedplot = function(x, options) {

@@ -8,7 +8,7 @@
 #' str(all_patterns)
 all_patterns = list(
   `rnw` = list(
-    chunk.begin = '^\\s*<<(.*)>>=', chunk.end = '^\\s*@\\s*(%+.*|)$',
+    chunk.begin = '^\\s*<<(.*)>>=.*$', chunk.end = '^\\s*@\\s*(%+.*|)$',
     inline.code = '\\\\Sexpr\\{([^}]+)\\}', inline.comment = '^\\s*%.*',
     ref.chunk = '^\\s*<<(.+)>>\\s*$', header.begin = '\\s*\\\\documentclass[^}]+\\}',
     document.begin = '\\s*\\\\begin\\{document\\}'),
@@ -32,9 +32,9 @@ all_patterns = list(
     ref.chunk = '^\\s*<<(.+)>>\\s*$', inline.code = '`r +([^`\n]+)\\s*`'),
 
   `rst` = list(
-    chunk.begin = "^\\s*[.][.]\\s+\\{r(.*)\\}\\s*$",
-    chunk.end = "^\\s*[.][.]\\s+[.][.]\\s*$", chunk.code = "^[.][.]",
-    ref.chunk = "^\\.*\\s*<<(.+)>>\\s*$", inline.code = ":r:`([^`]+)`"),
+    chunk.begin = '^\\s*[.][.]\\s+\\{r(.*)\\}\\s*$',
+    chunk.end = '^\\s*[.][.]\\s+[.][.]\\s*$', chunk.code = '^[.][.]',
+    ref.chunk = '^\\.*\\s*<<(.+)>>\\s*$', inline.code = ':r:`([^`]+)`'),
 
   `asciidoc` = list(
     chunk.begin = '^//\\s*begin[.]rcode(.*)$', chunk.end = '^//\\s*end[.]rcode\\s*$',
@@ -42,7 +42,7 @@ all_patterns = list(
     inline.code = '[+]r +([^+\n]+)\\s*[+]', inline.comment = '^//.*')
 )
 
-.sep.label = '^#+\\s*(@knitr|----+)(.*?)-*$'  # pattern for code chunks in an R script
+.sep.label = '^#+\\s*(@knitr|----+)(.*?)-*\\s*$'  # pattern for code chunks in an R script
 
 ## initial pattern list
 .pat.init = list(
@@ -119,7 +119,7 @@ pat_asciidoc = function() set_pattern('asciidoc')
 
 ## is it a group pattern?
 group_pattern = function(pattern) {
-  !is.null(pattern) && str_detect(pattern, '\\(.+\\)')
+  !is.null(pattern) && grepl('\\(.+\\)', pattern)
 }
 
 ## automatically detect the chunk patterns

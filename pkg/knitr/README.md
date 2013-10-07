@@ -15,15 +15,18 @@ frequently asked questions (including where to ask questions).
 You can install the stable version on
 [CRAN](http://cran.r-project.org/package=knitr):
 
-```r
+```s
 install.packages('knitr', dependencies = TRUE)
 ```
 
 You can also install the development version from
 [RForge](http://rforge.net/knitr/), which provides daily build of **knitr**:
 
-```r
-install.packages('knitr', repos = 'http://www.rforge.net/', type = 'source')
+```s
+# update all existing packages first
+update.packages(ask = FALSE, repos = 'http://cran.rstudio.org')
+install.packages('knitr', repos = c('http://rforge.net', 'http://cran.rstudio.org'),
+                 type = 'source')
 ```
 
 If you know GIT and `R CMD build`, here is another way:
@@ -81,11 +84,13 @@ Sweave).
 
 ## Usage
 
-```r
+```s
 library(knitr)
 ?knit
 knit(input)
 ```
+
+[<img src="http://i.imgur.com/R6DSHDE.jpg" align="right" />](http://amzn.com/1482203537)
 
 If options are not explicitly specified, **knitr** will try to guess
 reasonable default settings. A few manuals are available such as the [main
@@ -93,7 +98,8 @@ manual](https://bitbucket.org/stat/knitr/downloads/knitr-manual.pdf), the
 [graphics
 manual](https://bitbucket.org/stat/knitr/downloads/knitr-graphics.pdf), and
 the [themes
-manual](https://bitbucket.org/stat/knitr/downloads/knitr-themes.pdf).
+manual](https://bitbucket.org/stat/knitr/downloads/knitr-themes.pdf). For a
+more organized reference, see the [knitr book](http://amzn.com/1482203537).
 
 ## Contributing
 

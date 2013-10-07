@@ -21,6 +21,10 @@
 #'   default it follows the roxygen convention, but it can be customized, e.g.
 #'   if you want to use \code{##} to denote documentation, you can use
 #'   \code{'^##\\\\s*'}
+#' @param comment a pair of regular expressions for the start and end delimiters
+#'   of comments; the lines between a start and an end delimiter will be
+#'   ignored; by default, the delimiters are \verb{/*} in the beginning and
+#'   \verb{*/} in the end of a line (following the convention of C comments)
 #' @author Yihui Xie, with the original idea from Richard FitzJohn (who named it
 #'   as \code{sowsear()} which meant to make a silk purse out of a sow's ear)
 #' @return If \code{text} is \code{NULL}, the path of the final output document,
@@ -37,6 +41,11 @@
 #'
 #' #+ label, opt=value
 #'
+#' # /*
+#' #' these lines are treated as comments in spin()
+#' 1+1
+#' # */
+#'
 #' (s = system.file('examples', 'knitr-spin.R', package = 'knitr'))
 #' spin(s)  # default markdown
 #' o = spin(s, knit = FALSE) # convert only; do not make a purse yet
@@ -48,20 +57,28 @@
 #' spin(s, FALSE, format='Rtex')
 #' spin(s, FALSE, format='Rrst')
 spin = function(hair, knit = TRUE, report = TRUE, text = NULL, envir = parent.frame(),
-                format = c('Rmd', 'Rnw', 'Rhtml', 'Rtex', 'Rrst'), doc = "^#+'[ ]?") {
+                format = c('Rmd', 'Rnw', 'Rhtml', 'Rtex', 'Rrst'), doc = "^#+'[ ]?",
+                comment = c("^[# ]*/[*]", "^.*[*]/ *$")) {
 
   format = match.arg(format)
   x = if (nosrc <- is.null(text)) readLines(hair, warn = FALSE) else split_lines(text)
-  r = rle(str_detect(x, doc))
+  stopifnot(length(comment) == 2L)
+  c1 = grep(comment[1], x); c2 = grep(comment[2], x)
+  if (length(c1) != length(c2))
+    stop('comments must be put in pairs of start and end delimiters')
+  # remove comments
+  if (length(c1)) x = x[-unique(unlist(mapply(seq, c1, c2, SIMPLIFY = FALSE)))]
+
+  r = rle(grepl(doc, x))
   n = length(r$lengths); txt = vector('list', n); idx = c(0L, cumsum(r$lengths))
   p = .fmt.pat[[tolower(format)]]
-  p1 = str_replace(str_c('^', p[1L], '.*', p[2L], '$'), '\\{', '\\\\{')
+  p1 = gsub('\\{', '\\\\{', str_c('^', p[1L], '.*', p[2L], '$'))
 
   for (i in seq_len(n)) {
     block = x[seq(idx[i] + 1L, idx[i+1])]
     txt[[i]] = if (r$value[i]) {
       # normal text; just strip #'
-      str_replace(block, doc, '')
+      sub(doc, '', block)
     } else {
       # R code; #+/- indicates chunk options
       block = strip_white(block) # rm white lines in beginning and end
@@ -69,7 +86,7 @@ spin = function(hair, knit = TRUE, report = TRUE, text = NULL, envir = parent.fr
       if (length(opt <- grep('^#+(\\+|-| ----+| @knitr)', block))) {
         block[opt] = str_c(p[1L], gsub('^#+(\\+|-| ----+| @knitr)\\s*|-*\\s*$', '', block[opt]), p[2L])
       }
-      if (!str_detect(block[1L], p1)) {
+      if (!grepl(p1, block[1L])) {
         block = c(str_c(p[1L], p[2L]), block)
       }
       c('', block, p[3L], '')
@@ -78,7 +95,7 @@ spin = function(hair, knit = TRUE, report = TRUE, text = NULL, envir = parent.fr
 
   txt = unlist(txt)
   # make it a complete TeX document if document class not specified
-  if (report && format %in% c('Rnw', 'Rtex') && !str_detect(txt, '^\\s*\\\\documentclass')) {
+  if (report && format %in% c('Rnw', 'Rtex') && !grepl('^\\s*\\\\documentclass', txt)) {
     txt = c('\\documentclass{article}', '\\begin{document}', txt, '\\end{document}')
   }
   if (nosrc) {

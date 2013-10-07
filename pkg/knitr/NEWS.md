@@ -1,3 +1,109 @@
+# CHANGES IN knitr VERSION 1.6
+
+## NEW FEATURES
+
+- added an argument `prefix` to `write_bib()` so that we can customize the prefix for bib entries; we can also set `options(knitr.bib.prefix = 'a_string')` so that `write_bib()` uses this global option as the default value for `prefix` (thanks, Michael Friendly)
+
+## BUG FIXES
+
+- fixed a regression bug that makes knitr fail to add `\ensuremath{}` to scientific notations of numbers of the form `10^{n}` in LaTeX output (thanks, Jeffrey Racine)
+
+- due to the change in evaluate v0.5, evaluate() may return the raw values of expressions, but the S3 method wrap() does not know how to handle them; now these values are just ignored (thanks, Dan Tenenbaum)
+
+- fixed a bug for dep_auto() that may occur if old cache files generated from previous versions of knitr are used (thanks, Jeffrey Racine)
+
+- fixed the bug reported at http://stackoverflow.com/q/19166724/559676: the inline hook did not work well with non-numeric values, e.g. Date (thanks, Waldir Leoncio)
+
+# CHANGES IN knitr VERSION 1.5
+
+## NEW FEATURES
+
+- a new option value `results='hold'` to flush all text output to the end of a chunk like `fig.show='hold'` (thanks, Harlan Harris, #593)
+
+- when cache is enabled, automatic chunk dependencies can be truly automatic now; there is no need to call `dep_auto()` explicitly, and all we need to do is the chunk option `autodep=TRUE`; the chunk dependencies will be rebuilt after each chunk, so when new chunks are inserted into the document, **knitr** can also figure out the new dependencies automatically (thanks, @knokknok, #592)
+
+- for Sublime Text users, there is a [SublimeKnitr](https://github.com/andrewheiss/SublimeKnitr) package to support LaTeX and Markdown with **knitr**; thanks, Andrew Heiss (#449) (this is not really a new feature of knitr **itself**, though)
+
+- now the chunk options `warning` and `message` can also take numeric values as indices to select which warnings/messages to include in the output (thanks, Simon Urbanek, #590)
+
+## BUG FIXES
+
+- code changes in chunks should invalidate the cache when the chunk option `cache < 3`; fixed by @knokknok in #587
+
+- fixed the bug reported at http://stackoverflow.com/q/18302179/559676; before evaluating inline R code, the chunk options `eval` must be evaluated to a logical value
+
+- fixed the bug reported at http://stackoverflow.com/q/18544045/559676; read_chunk() no longer excludes code without chunk headers, so stitch() will include all the code as expected
+
+- fixed the bug reported under http://stackoverflow.com/a/18541083/559676; now `\ensuremath{}` can be correctly applied to numbers of the form `10^{-n}`
+
+- fixes a regression bug reported by Graham Williams: https://groups.google.com/forum/#!topic/knitr/_I5rlo9tOeA the global chunk options set in child documents are no longer restored
+
+- fixed #604: `kable()` did not work on data frames/matrices of one row (thanks, Kevin Ushey)
+
+- fixes the bug reported at http://stackoverflow.com/q/18992260/559676; `render_jekyll('prettify')` should have pasted the source code lines into one character string
+
+## MAJOR CHANGES
+
+- when the chunk option `cache=2`, the recorded plots (i.e. display lists) will no longer be cached, and the figure files will be assumed to exist the next time the document is compiled, otherwise the cache will be purged and the chunk needs to be recomputed; this will save some disk space and avoid bugs like #588 (thanks, @knokknok)
+
+## MINOR CHANGES
+
+- the Rnw chunk syntax is more tolerant on chunk headers in the sense that any characters after `<<>>=` are discarded, e.g. `<<echo=TRUE>>===foo` will be treated as `<<echo=TRUE>>=` (thanks, Michael Friendly)
+
+- `knitr:::.onLoad()` no longer modifies the `PATH` variable when `/usr/texbin` is not in `PATH` under Mac OS
+
+- when a message/warning/error contains line breaks, they are preserved and the message will not be re-wrapped (#602, thanks, Tyler Rinker)
+
+- `read_chunk()` tolerates white spaces in the end of the chunk headers now (suggested by John Maindonald, #606)
+
+- for R HTML documents, only the `highlight` component in `opts_knit$get('header')` was used in previous versions; now all components except `framed` and `tikz` are used; this makes it possible to further customize the HTML header (thanks, Wahlen Neuwirth and Erich Neuwirth)
+
+- in previous versions, the global option `KNITR_WIDTH` in R was used to set `options(width)`; now this option is set from `opts_knit$get('width')`, which has the same default value `75` (#597)
+
+# CHANGES IN knitr VERSION 1.4
+
+## NOTE
+
+- if you are using Windows or Linux, you need to read the news about both versions 1.3 and 1.4, because the version 1.3 did not manage to survive on CRAN
+
+## NEW FEATURES
+
+- the cache system is more granular now: instead of the binary option `cache = TRUE / FALSE`, we can specify `cache = 0, 1, 2, 3` (`TRUE` indicates 3, and `FALSE` indicates 0; for 1 and 2, see the documentation for `cache`: http://yihui.name/knitr/options); this means we may change the chunk options involved only with output rendering (e.g. from `echo = TRUE` to `FALSE`, or set `fig.cap = 'a new caption'`) without breaking the cache (thanks, Jeroen Ooms, Clark Kogan, and Roman Lustrik, #396, #536)
+
+- added two new vignette engines called `docco_linear` and `docco_classic` using the Docco styles (http://jashkenas.github.io/docco/); see `browseVignettes(package = 'knitr')` for examples
+
+- added a function `rocco()` to compile R Markdown documents to HTML using the classic Docco style, i.e. a two-column layout, with text on the left and code on the right (thanks, Weicheng Zhu, #577)
+
+- added an argument `comment` in `spin()` to specify comment lines that will be ignored by `spin()`; by default, the block comment `/* comment */` is recognized; thanks, Bryan Hanson http://stackoverflow.com/q/17664401/559676
+
+- it is possible to set package options prior to loading the **knitr** package now: for a package option `foo`, we can set `options(knitr.foo = value)` so that **knitr** will `opts_knit$set(foo = value)` when calling `knit()`; see `?opts_knit` for details (thanks, Zhiguang Zhao)
+
+- added a new argument `ext` to the `pandoc()` function so that users can manually specify the output filename extensions (thanks, baptiste, http://stackoverflow.com/q/17710249/559676)
+
+- for LaTeX and HTML output, syntax highlighting can be done for languages besides R (e.g. Python, Perl, ...); this is achieved by `highr::hi_andre()`, so Andre Simon's Highlight must be installed, otherwise **knitr** will fall back to verbatim output for source code; see https://github.com/yihui/knitr-examples/blob/master/098-highlight-python.Rnw for an example (#495)
+
+## MAJOR CHANGES
+
+- **knitr** formally depends on the **highr** package now (for syntax highlighting of LaTeX and HTML)
+
+- the package option `stop_on_error` has been deprecated; now it is much easier to specify whether you want to stop on errors or not by using the existing chunk option `error`; if you want to stop, use `error=FALSE`; see the documentation for details: http://yihui.name/knitr/options
+
+- the meanings of the chunk options `warning` and `message` when they take the value `FALSE` have also changed: `FALSE` means the warnings/messages will be printed in the R console and not recorded; this makes it easier to know when/where the warnings/messages were produced during `knit()`
+
+- syntax highlighting and adding prompts are done in the `source` hook now; in previous versions, they were done in `knitr:::wrap.source`; now the `source` hook receives the pure source code instead of syntax highlighted code
+
+## MINOR CHANGES
+
+- for the chunk options set in package option `opts_knit$get('eval.after')`, they will not be evaluated after a chunk if `eval=FALSE` for that chunk (#570, thanks, @knokknok)
+
+- for document formats that produce HTML output, the default graphical device is changed to `png` only if it is `pdf`; if the device has been changed to values other than `pdf`, **knitr** will no longer modify it internally; when the `png` device is not available, the `svg` device will be used instead
+
+- removed the global option `KNITR_PROGRESS`, which was introduced to suppress the progress bar, but now we have got `knit(..., quiet = TRUE)`, so this option is redundant
+
+## BUG FIXES
+
+- in LaTeX output, the double quotes `"` in the messages, errors, and warnings are replaced by `"{}` because they might cause trouble to babel: http://stackoverflow.com/q/18125539/559676 (thanks, Thierry)
+
 # CHANGES IN knitr VERSION 1.3
 
 ## NEW FEATURES
@@ -27,6 +133,8 @@
 - the chunk option `fig.align` also works for Markdown output now, e.g., `fig.align = 'center'` will center images in HTML via the `style` attribute of the `<img>` tag (#387)
 
 - the argument `format` in the `pandoc()` function was vectorized, e.g. we can call `pandoc(input, format = c('html', 'latex'))` and the input file will be converted to HTML and LaTeX, respectively (#547, thanks, Jeroen Ooms)
+
+- added an argument `options` to `knit_child()` to set global chunk options for child documents; if a parent chunk calls a child document (via the `child` option), the chunk options of the parent chunk will be used as global options for the child document, e.g. for `<<foo, child='bar.Rnw', fig.path='figure/foo-'>>=`, the figure path prefix will be `figure/foo-` in `bar.Rnw`; see http://stackoverflow.com/q/17514055/559676 for an application
 
 - `eclipse_theme()` works with font weight (bold) and font style (italic) now when parsing themes from http://eclipsecolorthemes.org
 
@@ -60,6 +168,8 @@
 
 - the commands for syntax highlighting were changed for compatibility with Andre Simon's Highlight package; this will affect LaTeX and HTML users, e.g. `\hlnumber` was renamed to `\hlnum`; cached LaTeX and HTML will have to be rebuilt for the new syntax highlighting commands to work (#470)
 
+- the argument `eval` was removed in `knit_child()`; if we do not want to evaluate a child document, we can set `eval=FALSE` in its parent chunk
+
 - the script `inst/bin/knit` gains an option `-o` to specify the output filenames for `knit()` (#525, thanks, Aaron Wolen)
 
 - the default video format for animations is OGG (it is open and free) instead of MP4 (non-free) now; this means Internet Explorer under Windows may not work with the animations (consider Firefox, Chrome and other modern web browsers)
@@ -72,9 +182,19 @@
 
 - for Markdown output, the figure filenames no longer allow special characters like spaces, and special characters will be automatically replaced by `_`; this change will avoid problems when publishing to RPubs from RStudio: if figure paths contain special characters, the figures will not be uploaded (thanks, Sangsoon Woo)
 
+## MINOR CHANGES
+
+- the package vignettes uses `\VignetteEngine{knitr::knitr}` instead of `\VignetteEngine{knitr}` so that the next version of R can compile the vignettes out of the box (via `R CMD Sweave`) and no longer need to build the whole package in order to build the vignettes
+
 ## MAINTAINENCE
 
+- the package vignettes were moved to the `vignettes` directory from `inst/doc` since the former will be preferred by the future versions of R
+
 - the testing is done via the **testit** package now (http://cran.r-project.org/package=testit)
+
+## MISC
+
+- **knitr** becomes an affiliated project of FOAS (Foundation for Open Access Statistics): http://www.foastat.org/projects.html
 
 # CHANGES IN knitr VERSION 1.2
 

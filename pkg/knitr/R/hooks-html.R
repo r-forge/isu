@@ -130,8 +130,6 @@ hook_scianimator = function(x, options) {
 #' @rdname hook_animation
 #' @export
 hook_r2swf = function(x, options) {
-  library(R2SWF)
-
   fig.num = options$fig.num
   # set up the R2SWF run
   fig.name = str_c(sub(str_c(fig.num, '$'), '', x[1]), 1:fig.num, '.', x[2])
@@ -140,6 +138,8 @@ hook_r2swf = function(x, options) {
   w = options$out.width %n% (options$fig.width * options$dpi)
   h = options$out.height %n% (options$fig.height * options$dpi)
 
+  swf2html = getFromNamespace('swf2html', 'R2SWF')
+  file2swf = getFromNamespace('file2swf', 'R2SWF')
   swfhtml = swf2html(file2swf(files = fig.name, swf.name, interval = options$interval),
                      output = FALSE, fragment = TRUE,  width = w, height = h)
   if(options$fig.align == 'default') return(swfhtml)
@@ -150,12 +150,15 @@ hook_r2swf = function(x, options) {
 #' @export
 render_html = function() {
   knit_hooks$restore()
-  opts_chunk$set(dev = 'png') # default device is png in HTML and markdown
+  set_html_dev()
   opts_knit$set(out.format = 'html')
   ## use div with different classes
   html.hook = function(name) {
     force(name)
     function (x, options) {
+      if (name == 'source') {
+        x = paste(c(hilight_source(x, 'html', options), ''), collapse = '\n')
+      }
       sprintf('<div class="%s"><pre class="knitr %s">%s</pre></div>\n', name, tolower(options$engine), x)
     }
   }
